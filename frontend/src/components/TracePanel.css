@@ -1,0 +1,84 @@
+.trace-panel {
+  background: rgba(214,224,248,0.65);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid rgba(255,255,255,0.6);
+  box-shadow: 0 8px 32px rgba(150,120,150,0.08), inset 0 1px 0 rgba(255,255,255,0.5);
+  border-radius: 18px;
+  padding: 22px 24px;
+  font-family: var(--font-display);
+  font-size: 13.5px;
+  min-height: 200px;
+  width: 100%;
+}
+
+.trace-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 16px;
+  margin-bottom: 4px;
+}
+
+.tl-dot { display: none; }
+
+.trace-filename {
+  font-family: var(--font-mono);
+  color: var(--text-faint);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.trace-filename::before {
+  content: '';
+  display: inline-block;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--pink);
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+.trace-empty { color: var(--text-faint); padding: 12px 0; font-size: 14px; font-style: italic; font-family: var(--font-voice); }
+
+.trace-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--hairline);
+  animation: fadeIn 0.4s ease;
+}
+.trace-row:last-child { border-bottom: none; }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.trace-agent {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  padding: 4px 9px;
+  border-radius: 999px;
+  text-transform: lowercase;
+  min-width: 66px;
+  text-align: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.trace-agent.planner { background: var(--pink-bg); color: var(--pink); }
+.trace-agent.executor { background: var(--hairline); color: var(--text-muted); }
+.trace-agent.critic { background: #ede9fb; color: var(--lavender); }
+.trace-agent.system { background: #d9f5ea; color: #2fb88f; font-weight: 700; }
+
+.trace-text { color: var(--text); word-break: break-word; min-width: 0; line-height: 1.5; }
+
+.trace-row.warn .trace-text { color: var(--danger); }
+.trace-row.ok .trace-text { color: var(--success); }
+
+.cursor-row { border-bottom: none; padding-top: 4px; }
+.cursor-blink { color: var(--pink); font-weight: 600; animation: blink 1s step-start infinite; }
+@keyframes blink { 50% { opacity: 0; } }

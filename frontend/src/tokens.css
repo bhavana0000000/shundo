@@ -1,0 +1,141 @@
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Fraunces:ital,wght@1,400;1,500;1,600&display=swap');
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg-base: #f0ecf7;
+  --bg-cream: #f6f1f9;
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --hairline: #e2ddef;
+  --hairline-strong: #cfc6e8;
+  --text: #1a1a1c;
+  --text-muted: #6b6b70;
+  --text-faint: #a3a1a8;
+  --pink: #3d7bc9;
+  --pink-soft: #8fb8e8;
+  --pink-dim: #5a8fc9;
+  --pink-glow: rgba(61, 123, 201, 0.32);
+  --pink-bg: #e6f0fa;
+  --violet: #6a4fb3;
+  --violet-soft: #9d85d6;
+  --blue-violet: #5b8fd6;
+  --cyan: #7fd8e8;
+  --lavender: #6a4fb3;
+  --lavender-soft: #c4b8ec;
+  --lavender-glow: rgba(91, 143, 214, 0.28);
+  --danger: #c14f3a;
+  --success: #3f8a55;
+  --font-display: 'Instrument Sans', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-voice: 'Fraunces', serif;
+}
+
+html, body {
+  background-color: #ffffff;
+  color: var(--text);
+  font-family: var(--font-display);
+  overflow-x: hidden;
+  width: 100%;
+  min-height: 100vh;
+  position: relative;
+}
+
+#root { min-height: 100vh; width: 100%; overflow-x: hidden; }
+
+a { color: inherit; }
+button { font-family: inherit; }
+
+.shun-word {
+  font-family: var(--font-voice);
+  font-style: italic;
+  font-weight: 500;
+  color: var(--pink);
+}
+
+.pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--pink);
+  box-shadow: 0 0 0 0 var(--pink-glow);
+  animation: pulseRing 2.2s ease-out infinite;
+  flex-shrink: 0;
+}
+
+@keyframes pulseRing {
+  0% { box-shadow: 0 0 0 0 var(--pink-glow); }
+  70% { box-shadow: 0 0 0 8px rgba(232,116,143,0); }
+  100% { box-shadow: 0 0 0 0 rgba(232,116,143,0); }
+}
+
+.mono-tag {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.btn {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 13px 26px;
+  border-radius: 999px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-fill { background: var(--text); color: var(--bg-cream); }
+.btn-fill:hover { background: var(--pink); color: #fff; transform: translateY(-1px); box-shadow: 0 8px 24px var(--pink-glow); }
+
+.btn-ghost {
+  background: rgba(255,255,255,0.6);
+  color: var(--text);
+  border-color: var(--hairline-strong);
+  backdrop-filter: blur(8px);
+}
+.btn-ghost:hover { border-color: var(--pink); background: var(--pink-bg); }
+
+.btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none !important; }
+
+.glow-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 900px 600px at 15% -10%, var(--pink-glow), transparent 60%),
+    radial-gradient(ellipse 700px 500px at 100% 20%, var(--lavender-glow), transparent 55%);
+}
+
+.glass {
+  background: rgba(255,255,255,0.45);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid rgba(255,255,255,0.6);
+  box-shadow: 0 8px 32px rgba(150,120,150,0.08), inset 0 1px 0 rgba(255,255,255,0.5);
+}
+
+.glass-strong {
+  background: rgba(255,255,255,0.6);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid rgba(255,255,255,0.7);
+  box-shadow: 0 12px 40px rgba(150,120,150,0.1), inset 0 1px 0 rgba(255,255,255,0.6);
+}
+
+::selection { background: var(--pink-glow); color: var(--text); }
+
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: var(--bg-base); }
+::-webkit-scrollbar-thumb { background: var(--hairline-strong); border-radius: 4px; }
+
+.reveal { opacity: 0; transform: translateY(28px); transition: opacity 0.7s ease, transform 0.7s ease; }
+.reveal-in { opacity: 1; transform: translateY(0); }
+
+.dash-header h1 { font-size: 28px; font-weight: 600; margin-top: 8px; }
+.dash-sub { margin-top: 10px; color: var(--text-muted); font-size: 14px; line-height: 1.6; max-width: 480px; }

@@ -1,0 +1,61 @@
+.profile-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 28px;
+  padding: 18px 20px;
+  background: rgba(214,224,248,0.6);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid rgba(255,255,255,0.6);
+  border-radius: 6px;
+  max-width: 420px;
+}
+
+.profile-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--pink-bg);
+  color: var(--pink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-voice);
+  font-style: italic;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.profile-name { font-weight: 600; font-size: 15px; }
+.profile-sub { font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+.connection-list {
+  margin-top: 32px;
+  max-width: 640px;
+  border: 1px solid rgba(255,255,255,0.6);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.connection-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--hairline);
+}
+.connection-row:last-child { border-bottom: none; }
+
+.connection-name { font-weight: 600; font-size: 14px; }
+.connection-desc { color: var(--text-muted); font-size: 12.5px; margin-top: 4px; }
+
+.connection-badge {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+.connection-badge.ok { color: var(--success); }
+.connect-btn { font-family: var(--font-mono); font-size: 12px; padding: 8px 14px; }

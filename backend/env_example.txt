@@ -1,0 +1,8 @@
+GOOGLE_CLIENT_SECRETS_FILE=credentials.json
+GOOGLE_REDIRECT_URI=http://localhost:8000/auth/google/callback
+TOKEN_STORE_FILE=token_store.json
+
+NVIDIA_API_KEY=nvapi-your-key-here
+NVIDIA_MODEL=nvidia/nemotron-3-ultra-550b-a55b
+
+FRONTEND_ORIGIN=http://localhost:5173
