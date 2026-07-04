@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import TopShell from '../layout/TopShell';
-import { BACKEND_URL } from '../config';
+import { BACKEND_URL, authHeaders } from '../config';
 import './TasksPage.css';
 
 export default function TasksPage() {
@@ -12,7 +12,7 @@ export default function TasksPage() {
   const fetchTasks = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${BACKEND_URL}/api/tasks`, { credentials: 'include' });
+      const res = await fetch(`${BACKEND_URL}/api/tasks`, { headers: authHeaders() });
       const data = await res.json();
       setTasks(data.tasks || []);
     } catch (e) {
@@ -30,8 +30,7 @@ export default function TasksPage() {
     try {
       await fetch(`${BACKEND_URL}/api/tasks`, {
         method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ title: newTask.trim() }),
       });
       setNewTask('');
@@ -43,7 +42,7 @@ export default function TasksPage() {
   };
 
   const handleComplete = async (id) => {
-    await fetch(`${BACKEND_URL}/api/tasks/${id}/complete`, { method: 'POST', credentials: 'include' });
+    await fetch(`${BACKEND_URL}/api/tasks/${id}/complete`, { method: 'POST', headers: authHeaders() });
     fetchTasks();
   };
 

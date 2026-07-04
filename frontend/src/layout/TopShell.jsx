@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { to: '/app/calendar', label: 'calendar' },
   { to: '/app/tasks', label: 'tasks' },
   { to: '/app/budget', label: 'budget' },
+  { to: '/app/upload', label: 'upload' },
   { to: '/app/profile', label: 'profile' },
 ];
 

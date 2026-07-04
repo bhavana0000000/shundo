@@ -8,6 +8,7 @@ import BudgetTracker from './pages/BudgetTracker';
 import CalendarPage from './pages/CalendarPage';
 import TasksPage from './pages/TasksPage';
 import Profile from './pages/Profile';
+import DocumentUpload from './pages/DocumentUpload';
 import './tokens.css';
 
 export default function App() {
@@ -27,6 +28,7 @@ export default function App() {
         <Route path="/app/tasks" element={<TasksPage />} />
         <Route path="/app/budget" element={<BudgetTracker />} />
         <Route path="/app/profile" element={<Profile />} />
+        <Route path="/app/upload" element={<DocumentUpload />} />
       </Routes>
     </BrowserRouter>
   );

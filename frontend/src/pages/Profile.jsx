@@ -1,20 +1,20 @@
 import { useState, useEffect } from 'react';
 import TopShell from '../layout/TopShell';
-import { BACKEND_URL } from '../config';
+import { BACKEND_URL, authHeaders, withSession } from '../config';
 import './Profile.css';
 
 export default function Profile() {
   const [authStatus, setAuthStatus] = useState(null);
 
   useEffect(() => {
-    fetch(`${BACKEND_URL}/auth/google/status`, { credentials: 'include' })
+    fetch(`${BACKEND_URL}/auth/google/status`, { headers: authHeaders() })
       .then((r) => r.json())
       .then(setAuthStatus)
       .catch(() => setAuthStatus({ authenticated: false, user: null }));
   }, []);
 
   const handleConnect = () => {
-    window.location.href = `${BACKEND_URL}/auth/google/login`;
+    window.location.href = withSession(`${BACKEND_URL}/auth/google/login`);
   };
 
   const isAuthed = authStatus?.authenticated;

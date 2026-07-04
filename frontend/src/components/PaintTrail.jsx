@@ -1,6 +1,12 @@
 import { useEffect, useRef } from 'react';
 
-const COLORS = ['#2fb88f', '#3d7bc9', '#7a4fd6', '#3ec9dc', '#5a9fd6'];
+const COLORS = [
+  [47, 184, 143],   // teal
+  [61, 123, 201],   // blue
+  [122, 79, 214],   // violet
+  [62, 201, 220],   // cyan
+  [90, 159, 214],   // sky blue
+];
 
 export default function PaintTrail() {
   const canvasRef = useRef(null);
@@ -25,48 +31,44 @@ export default function PaintTrail() {
     }
     window.addEventListener('mousemove', handleMove);
 
-    function drawPoint(p) {
-      // Cheap radial gradient instead of ctx.filter blur - dramatically
-      // faster since browsers don't have to run a real blur raster pass
-      // on every shape, every frame.
-      const gradient = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size);
-      gradient.addColorStop(0, p.color);
-      gradient.addColorStop(1, 'transparent');
-      ctx.fillStyle = gradient;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
     function animate() {
       frameCount++;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.globalCompositeOperation = 'screen';
 
-      // Generate a new point roughly every 4th frame instead of every 2nd -
-      // fewer points to draw = less work per frame, still looks continuous.
-      if (mouseRef.current.active && frameCount % 4 === 0) {
+      // Spawn a new drifting blob every couple frames - cheap now since
+      // there's no per-shape blur to compute, just a plain filled circle.
+      if (mouseRef.current.active && frameCount % 2 === 0) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 0.25 + Math.random() * 0.5;
         pointsRef.current.push({
           x: mouseRef.current.x,
           y: mouseRef.current.y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
           color: COLORS[Math.floor(Math.random() * COLORS.length)],
-          size: 22 + Math.random() * 14,
+          size: 30 + Math.random() * 22,
           life: 1,
         });
-        // Much smaller cap (30 vs 90) - the biggest single perf win, since
-        // every point costs a full radial-gradient + fill each frame.
-        if (pointsRef.current.length > 30) pointsRef.current.shift();
+        if (pointsRef.current.length > 34) pointsRef.current.shift();
       }
 
       pointsRef.current.forEach((p) => {
-        p.life -= 0.02; // fades a bit faster to match the smaller cap
-        ctx.globalAlpha = Math.max(p.life * 0.4, 0);
-        drawPoint(p);
+        p.life -= 0.01; // slower fade = longer, smoother trail
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vx *= 0.985;
+        p.vy *= 0.985;
+
+        const [r, g, b] = p.color;
+        ctx.globalAlpha = Math.max(p.life * 0.6, 0);
+        ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fill();
       });
 
       pointsRef.current = pointsRef.current.filter((p) => p.life > 0);
       ctx.globalAlpha = 1;
-      ctx.globalCompositeOperation = 'source-over';
 
       animationId = requestAnimationFrame(animate);
     }
@@ -86,6 +88,10 @@ export default function PaintTrail() {
         position: 'fixed', top: 0, left: 0,
         width: '100vw', height: '100vh',
         zIndex: 1, pointerEvents: 'none',
+        filter: 'blur(22px)', // the soft halo look - one cheap GPU blur
+                              // pass on the whole canvas, instead of
+                              // per-shape blur which caused the lag
+        mixBlendMode: 'multiply',
       }}
     />
   );

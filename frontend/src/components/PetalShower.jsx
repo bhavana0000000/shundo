@@ -29,7 +29,7 @@ export default function PetalShower() {
         sway: Math.random() * Math.PI * 2,
         swaySpeed: 0.007 + Math.random() * 0.013,
         color: COLORS[Math.floor(Math.random() * COLORS.length)],
-        opacity: 0.12 + Math.random() * 0.18,
+        opacity: 0.35 + Math.random() * 0.35,
       };
     }
 

@@ -2,12 +2,14 @@
 Shundo backend - single entrypoint. Wires up Google OAuth, the calendar
 reflection loop, the dynamic multi-tool loop, and test/cleanup routes.
 """
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Request, Response
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Request, Response, UploadFile, File
 from pydantic import BaseModel
 from fastapi.responses import RedirectResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import time
 import uuid
+import os
+import tempfile
 from collections import defaultdict
 
 from app.config import FRONTEND_ORIGIN
@@ -17,39 +19,46 @@ from app.tools import (
     search_flights, search_hotels, search_events, search_places, web_search,
     create_email_draft, create_task, list_tasks, complete_task, add_note, list_notes,
     add_expense, get_total_spend, list_expenses, get_weather_forecast, convert_currency,
+    parse_pdf,
 )
 from app.agents import run_shundo, run_forced_conflict_test, run_dynamic_task, stream_dynamic_task
 
 app = FastAPI(title="Shundo Backend")
 
 app.add_middleware(
-    CORSMiddleware, allow_origins=[FRONTEND_ORIGIN], allow_credentials=True,
+    CORSMiddleware, allow_origins=["*"], allow_credentials=False,
     allow_methods=["*"], allow_headers=["*"],
 )
 
 
 # --- Session identity (per-browser data isolation for tasks/budget/notes) ---
+# IMPORTANT: We no longer rely on cookies for this. Cross-domain cookies
+# (frontend on pages.dev, backend on onrender.com) get silently blocked or
+# expired by modern browsers (Safari ITP, Chrome privacy protections) -
+# that's what was causing sign-in to randomly reset to guest mode. Instead,
+# the frontend generates its own session ID (stored in localStorage) and
+# sends it as a header on fetch requests, or a query param on the
+# WebSocket/OAuth-redirect URLs (which can't carry custom headers).
 
-SESSION_COOKIE_NAME = "shundo_session"
+SESSION_HEADER_NAME = "x-shundo-session"
 
 
-def get_or_create_session_id(request: Request, response: Response) -> str:
-    """Reads the session cookie if present, otherwise creates a new one.
-    This is what keeps each visitor's tasks/budget/notes separate."""
-    session_id = request.cookies.get(SESSION_COOKIE_NAME)
+def get_or_create_session_id(request: Request, response: Response = None) -> str:
+    """Reads the session ID from the request header (sent by the frontend).
+    Falls back to a fresh one only if the frontend genuinely sent nothing -
+    this should be rare once the frontend is updated."""
+    session_id = request.headers.get(SESSION_HEADER_NAME)
+    if not session_id:
+        session_id = request.query_params.get("session_id")
     if not session_id:
         session_id = str(uuid.uuid4())
-        response.set_cookie(
-            key=SESSION_COOKIE_NAME, value=session_id,
-            httponly=True, samesite="none", secure=True, max_age=60 * 60 * 24 * 30,
-        )
     return session_id
 
 
 def get_session_id_from_ws(websocket: WebSocket) -> str:
-    """WebSocket version - reads existing cookie, or generates a temporary
-    one if none exists yet (WebSocket handshakes can't set cookies)."""
-    return websocket.cookies.get(SESSION_COOKIE_NAME) or str(uuid.uuid4())
+    """WebSocket version - reads session_id from the query string, since
+    browsers can't attach custom headers to a WebSocket handshake."""
+    return websocket.query_params.get("session_id") or str(uuid.uuid4())
 
 
 # --- Rate limiting (protects LLM quota from abuse by public visitors) ---
@@ -83,14 +92,10 @@ def root():
 # --- Google OAuth ---
 
 @app.get("/auth/google/login")
-def google_login(request: Request, response: Response):
-    session_id = get_or_create_session_id(request, response)
+def google_login(request: Request):
+    session_id = get_or_create_session_id(request)  # frontend passes ?session_id=... on this URL
     auth_url = get_authorization_url(session_id)
-    redirect = RedirectResponse(auth_url)
-    # copy the session cookie onto the redirect response too, in case it was just created
-    if response.headers.get("set-cookie"):
-        redirect.headers["set-cookie"] = response.headers["set-cookie"]
-    return redirect
+    return RedirectResponse(auth_url)
 
 
 @app.get("/auth/google/callback")
@@ -309,3 +314,25 @@ def api_calendar_events(request: Request, response: Response):
     session_id = get_or_create_session_id(request, response)
     events = read_calendar_events(days_ahead=30, session_id=session_id)
     return {"events": events, "authenticated": is_authenticated(session_id)}
+
+
+# --- PDF upload API (real, used by the frontend document upload feature) ---
+
+@app.post("/api/upload-pdf")
+async def api_upload_pdf(file: UploadFile = File(...)):
+    """Accepts a real PDF upload, extracts structured info (dates, tasks,
+    summary) using the same parse_pdf tool the agent can call itself."""
+    if not file.filename.lower().endswith(".pdf"):
+        return {"error": "Please upload a PDF file."}
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+        contents = await file.read()
+        tmp.write(contents)
+        tmp_path = tmp.name
+
+    try:
+        result = parse_pdf(tmp_path)
+    finally:
+        os.unlink(tmp_path)  # always clean up the temp file, even on error
+
+    return result

@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
-import { WS_URL } from '../config';
+import { getWsUrl } from '../config';
 
 export function useAgentWebSocket() {
   const [trace, setTrace] = useState([]);
@@ -14,7 +14,7 @@ export function useAgentWebSocket() {
     setError(null);
     setStatus('connecting');
 
-    const ws = new WebSocket(WS_URL);
+    const ws = new WebSocket(getWsUrl());
     wsRef.current = ws;
 
     ws.onopen = () => {
