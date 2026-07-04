@@ -184,7 +184,7 @@ You'll need your own free keys for: an LLM provider (NVIDIA NIM / OpenRouter / H
 <tr>
 <td align="center"><a href="https://github.com/bhavana0000000"><b>bhavana0000000</b></a></td>
 <td align="center"><a href="https://github.com/karthik26-Thalari"><b>karthik26-Thalari</b></a></td>
-<td align="center"><b>Maddineni Renu Sri</b></td>
+<td align="center"><a href="https://github.com/RenuSri2"><b>Maddineni Renu Sri</b></td>
 <td align="center"><a href="https://github.com/Tanmayee1802"><b>Tanmayee1802</b></a></td>
 </tr>
 </table>
