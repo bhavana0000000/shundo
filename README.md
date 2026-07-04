@@ -1,126 +1,193 @@
-# Shundo
+<div align="center">
 
-**An autonomous AI agent that turns a vague goal into real, executed actions.**
+# 旬 Shundo
 
-🔗 **Live demo:** [shundo.pages.dev](https://shundo.pages.dev)
+### An autonomous AI agent that turns a vague goal into real, executed actions.
+
+*The moment something is ready — Shundo finds it, and acts.*
+
+[![Live Demo](https://img.shields.io/badge/demo-shundo.pages.dev-3d7bc9?style=for-the-badge)](https://shundo.pages.dev)
+[![License: MIT](https://img.shields.io/badge/license-MIT-7a4fd6?style=for-the-badge)](#license)
+
+[![Python](https://img.shields.io/badge/Python-3.11-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![LangGraph](https://img.shields.io/badge/LangGraph-1C3C3C?style=flat-square)](https://langchain-ai.github.io/langgraph/)
+[![React](https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev)
+[![Vite](https://img.shields.io/badge/Vite-646CFF?style=flat-square&logo=vite&logoColor=white)](https://vitejs.dev)
+[![Google Cloud](https://img.shields.io/badge/Google_OAuth-4285F4?style=flat-square&logo=google&logoColor=white)](https://console.cloud.google.com)
+
+**[Try the live demo →](https://shundo.pages.dev)**
+
+</div>
+
+---
+
+## Table of contents
+
+- [What it is](#what-it-is)
+- [Why it's different](#why-its-different)
+- [How it works](#how-it-works)
+- [The 11 tools](#the-11-tools)
+- [Real multi-user support](#real-multi-user-support)
+- [Frontend](#frontend)
+- [Tech stack](#tech-stack)
+- [Running it locally](#running-it-locally)
+- [Known limitations](#known-limitations)
+- [Contributors](#contributors)
+- [License](#license)
 
 ---
 
 ## What it is
 
-Shundo is a domain-agnostic "chief of staff" agent. Give it a goal — "plan a weekend trip to Goa," "schedule a study block this week," "plan the best way to learn DSA" — and it doesn't reply with a text plan you still have to execute yourself. It reasons through the goal, decides which real tools it needs, calls them for real against live services, checks its own work against fresh data, and fixes its own mistakes before it finishes.
+Give Shundo a goal — *"plan a weekend trip to Goa," "schedule a study block this week," "plan the best way to learn DSA"* — and it doesn't hand back a text plan you still have to go execute yourself. It **reasons** through the goal, **decides** which real tools it needs, **calls** them for real against live services, **checks** its own work against fresh data, and **fixes** its own mistakes before it's done.
 
-The name comes from the Japanese word **旬 (shun)** — the moment something is at its peak, ready, in season. Shundo finds the right moment and the right action for any goal, and acts on it.
+The name comes from the Japanese word **旬 (shun)** — the peak moment, when something is exactly ready. That's the whole idea: Shundo finds the right moment and the right action for any goal, and actually does it.
 
 ---
 
-## How it works — a real reflection loop, not a single LLM call
+## Why it's different
 
-Shundo runs on a three-agent graph, built with **LangGraph**:
+Most "AI agent" demos are a single LLM call wrapped in a chat box. Shundo isn't:
 
-- **Planner** — reads the goal and the full tool registry, then decides which tools to call and with what arguments. Nothing is hardcoded per domain.
-- **Executor** — calls the tools the planner selected, for real, against real APIs. Calls run in parallel where possible.
-- **Critic** — reviews what the executor actually did against **fresh, re-fetched real data**. If something's wrong — a scheduling conflict, a failed tool call — it routes back to the Planner with the specific problem, and the loop runs again.
+| | Typical agent wrapper | Shundo |
+|---|---|---|
+| Reasoning | One LLM call, done | Planner → Executor → **Critic** — a real second pass that checks real data |
+| Actions | Simulated / described | Real Google Calendar writes, real Gmail drafts, real live prices |
+| Self-correction | None | Critic re-fetches real state and can force a full replan |
+| Domain | Hardcoded per use case | Fully domain-agnostic — same loop, any goal |
+| Visibility | Spinner → final answer | Every step streamed live over WebSocket as it happens |
+| Users | Single shared session | Real per-user isolation — your data, your calendar, your login |
 
-This loop is provably real: in testing, the Critic caught an actual double-booked calendar slot, described the conflict back to the Planner, and the Planner proposed a different time — verified against a real Google Calendar, not mocked data.
+---
 
-The entire trace streams live to the frontend over a WebSocket, so you watch the agent think step by step instead of waiting for a spinner.
+## How it works
+
+Shundo runs on a three-agent graph built with **LangGraph**:
+
+```mermaid
+flowchart TD
+    A[User goal] --> P[Planner]
+    P -->|selects tools + args| E[Executor]
+    E -->|calls real APIs in parallel| T[(11 real tools)]
+    T --> C[Critic]
+    C -->|re-checks fresh real data| D{Problem found?}
+    D -->|yes, e.g. calendar conflict| P
+    D -->|no| F[✅ Done — results streamed to UI]
+
+    style P fill:#2fb88f,color:#fff
+    style E fill:#3d7bc9,color:#fff
+    style C fill:#7a4fd6,color:#fff
+    style F fill:#3ec9dc,color:#000
+```
+
+- **Planner** reads the goal and the full tool registry — via Python's `inspect`, it sees each tool's *real* function signature, not a vague description — and decides what to call and with what arguments. Nothing is hardcoded per domain.
+- **Executor** calls the selected tools for real, in parallel where possible, against real APIs.
+- **Critic** re-fetches **fresh, real data** after the fact — not the Planner's assumptions — and checks it. If something's wrong, it routes back to the Planner with the specific problem, and the loop runs again.
+
+This loop is provably real, not simulated: in testing, the Critic caught an actual double-booked calendar slot, described the conflict back to the Planner, and the Planner proposed a different time — verified against a real Google Calendar.
+
+The entire trace streams live to the frontend over a **WebSocket**, so you watch the agent think step-by-step instead of staring at a spinner.
 
 ---
 
 ## The 11 tools
 
-| Tool | What it does | Data source |
-|---|---|---|
-| **Calendar** | Reads and writes real Google Calendar events, per logged-in user | Google Calendar API (OAuth) |
-| **Email drafts** | Creates real Gmail drafts (never auto-sends) | Gmail API (OAuth) |
-| **Flights** | Live flight price search | Serper.dev + LLM extraction |
-| **Hotels** | Live hotel price search | Serper.dev + LLM extraction |
-| **Events** | Local event search | Serper.dev + LLM extraction |
-| **Places** | Restaurants, cafes, attractions near a location | OpenStreetMap (Nominatim + Overpass) |
-| **Web search** | General research | Serper.dev |
-| **Weather** | Real forecast for any city | Open-Meteo |
-| **Currency** | Live exchange-rate conversion | open.er-api.com |
-| **Tasks** | Create, list, complete reminders | SQLite, isolated per user |
-| **Budget** | Log and total real expenses | SQLite, isolated per user |
-| **PDF parsing** | Extracts structured dates/tasks from uploaded documents | pypdf + LLM |
+<table>
+<tr><th>Tool</th><th>What it does</th><th>Real data source</th></tr>
+<tr><td>📅 <b>Calendar</b></td><td>Reads &amp; writes real events, per logged-in user</td><td>Google Calendar API</td></tr>
+<tr><td>✉️ <b>Email drafts</b></td><td>Creates real Gmail drafts (never auto-sends)</td><td>Gmail API</td></tr>
+<tr><td>✈️ <b>Flights</b></td><td>Live flight price search</td><td>Serper.dev + LLM extraction</td></tr>
+<tr><td>🏨 <b>Hotels</b></td><td>Live hotel price search</td><td>Serper.dev + LLM extraction</td></tr>
+<tr><td>🎟️ <b>Events</b></td><td>Local event search</td><td>Serper.dev + LLM extraction</td></tr>
+<tr><td>📍 <b>Places</b></td><td>Restaurants, cafes, attractions nearby</td><td>OpenStreetMap</td></tr>
+<tr><td>🔎 <b>Web search</b></td><td>General research</td><td>Serper.dev</td></tr>
+<tr><td>🌦️ <b>Weather</b></td><td>Real forecast, any city</td><td>Open-Meteo</td></tr>
+<tr><td>💱 <b>Currency</b></td><td>Live exchange-rate conversion</td><td>open.er-api.com</td></tr>
+<tr><td>✅ <b>Tasks</b></td><td>Create / list / complete reminders</td><td>SQLite, isolated per user</td></tr>
+<tr><td>💰 <b>Budget</b></td><td>Log and total real expenses</td><td>SQLite, isolated per user</td></tr>
+</table>
 
-Every service used is genuinely free — no paid API keys anywhere in the stack.
+Every service above is genuinely free — **no paid API keys anywhere in this stack.**
 
 ---
 
 ## Real multi-user support
 
-Each visitor gets their own isolated session:
+This isn't a single shared demo session — each visitor gets real isolation:
 
-- **Guests** — Tasks/Budget/Notes are private to their own browser session, no shared data between visitors
-- **Logged-in users** — each person's real Google login is stored separately; when a friend signs in with their own Gmail, *their own* real calendar and email get used — fully isolated from everyone else's account
-- **Rate limiting** — capped runs per session per hour, to keep the shared demo usable for everyone
+- 🔒 **Guests** — Tasks/Budget/Notes are private to their own browser session; no visitor sees another's data
+- 🔑 **Logged-in users** — each person's real Google login is stored separately. When a friend signs in with their own Gmail, **their own** real calendar and email get used — fully isolated from your account and everyone else's
+- ⏱️ **Rate limiting** — capped runs per session per hour, so the shared free-tier LLM quota stays usable for everyone
 
 ---
 
 ## Frontend
 
-A full multi-page React app (Vite + React Router):
+A full multi-page React app, not a single demo screen:
 
-- **Landing** — animated hero with an interactive paint-trail cursor effect, glassmorphic design, scroll-triggered reveal animations
-- **Login** — real Google OAuth sign-in, or guest mode
-- **Dashboard** — type a goal, watch the agent think live, see results formatted into readable cards (flights, hotels, places, weather, tasks, expenses) instead of raw JSON
-- **Calendar** — real upcoming events pulled live from Google Calendar
-- **Tasks** — real add/complete list
-- **Budget tracker** — real expense log and running total
-- **Profile** — shows your real connected Google account
+- 🏠 **Landing** — animated hero, interactive paint-trail cursor, glassmorphic design, scroll-triggered reveals
+- 🔐 **Login** — real Google OAuth, or guest mode
+- 📊 **Dashboard** — type a goal, watch the agent think **live**, see results as readable cards instead of raw JSON
+- 📅 **Calendar** — real upcoming events, pulled live
+- ✅ **Tasks** — real add/complete list
+- 💰 **Budget tracker** — real expense log + running total
+- 👤 **Profile** — your real connected Google account
 
 ---
 
 ## Tech stack
 
-**Backend:** Python · FastAPI · LangGraph · LangChain · SQLite · WebSockets
-**Frontend:** React · Vite · React Router · Canvas API
-**LLM:** configurable across NVIDIA NIM, OpenRouter, and Hugging Face Inference
-**External APIs:** Google Calendar, Gmail, Serper.dev, OpenStreetMap, Open-Meteo, open.er-api.com
-**Deployment:** Render (backend) + Cloudflare Pages (frontend)
-**Cost:** $0 — every service used has a genuinely free tier
+**Backend** — Python · FastAPI · LangGraph · LangChain · SQLite · WebSockets
+**Frontend** — React · Vite · React Router · Canvas API
+**LLM** — configurable across NVIDIA NIM, OpenRouter, and Hugging Face Inference (swap via one env var)
+**External APIs** — Google Calendar, Gmail, Serper.dev, OpenStreetMap, Open-Meteo, open.er-api.com
+**Deployment** — Render (backend) + Cloudflare Pages (frontend)
+**Cost** — **$0**, every service used has a genuinely free tier
 
 ---
 
 ## Running it locally
 
 ```bash
-# Backend
+# ── Backend ──────────────────────────────
 cd backend
 python -m venv venv
-venv\Scripts\activate        # Windows
+venv\Scripts\activate          # Windows
 pip install -r requirements.txt
-# add your own API keys to a .env file (see .env.example)
+# copy .env.example → .env and fill in your own API keys
 uvicorn app.main:app --reload --port 8001
 
-# Frontend
+# ── Frontend ─────────────────────────────
 cd frontend
 npm install
 npm run dev
 ```
 
-You'll need your own free API keys for: an LLM provider (NVIDIA NIM / OpenRouter / Hugging Face), Serper.dev, and a Google Cloud OAuth client (Calendar + Gmail scopes). See `.env.example` in `backend/` for the full list of required variables.
+You'll need your own free keys for: an LLM provider (NVIDIA NIM / OpenRouter / Hugging Face), Serper.dev, and a Google Cloud OAuth client (Calendar + Gmail scopes). See `backend/.env.example` for the full list.
 
-> The live production backend URL is intentionally not published in this repo to prevent abuse of shared API quotas. Use the [live demo](https://shundo.pages.dev) to try Shundo without running it yourself, or spin up your own backend locally with your own keys.
+> **Note:** the production backend URL is intentionally not published here, to prevent abuse of shared API quotas. Use the [live demo](https://shundo.pages.dev) to try Shundo instantly, or run your own backend locally with your own keys using the steps above.
 
 ---
 
 ## Known limitations
 
-- Travel pricing (flights/hotels) is extracted from live search snippets by an LLM rather than a dedicated fares API — real fare APIs gate access behind commercial accounts not practical to acquire during the build window. Prices are representative, occasionally imprecise.
-- Free-tier LLM inference has variable latency depending on provider load at the time.
-- Google OAuth login currently requires each user to be within the app's consent screen limits, since it hasn't gone through Google's full verification review.
+- 💵 Travel pricing is extracted from live search snippets by an LLM, not a dedicated fares API — real fare APIs gate access behind commercial accounts. Prices are representative, occasionally imprecise.
+- ⏳ Free-tier LLM inference has variable latency depending on provider load at the time of your request.
+- ✅ Google OAuth login is currently within Google's standard app-consent limits, since the app hasn't gone through full verification review — the "unverified app" warning screen is expected and safe to click through.
 
 ---
 
 ## Contributors
 
-- **Maddineni Renu Sri**
-- **bhavana0000000**
-- **karthik26-Thalari**
-- **Tanmayee1802**
+<table>
+<tr>
+<td align="center"><a href="https://github.com/bhavana0000000"><b>bhavana0000000</b></a></td>
+<td align="center"><a href="https://github.com/karthik26-Thalari"><b>karthik26-Thalari</b></a></td>
+<td align="center"><b>Maddineni Renu Sri</b></td>
+<td align="center"><a href="https://github.com/Tanmayee1802"><b>Tanmayee1802</b></a></td>
+</tr>
+</table>
 
 ---
 
@@ -147,3 +214,11 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+---
+
+<div align="center">
+
+**shundo — the moment something is ready.**
+
+</div>
