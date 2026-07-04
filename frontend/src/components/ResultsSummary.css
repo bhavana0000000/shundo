@@ -6,10 +6,33 @@
   align-items: start;
 }
 
+.results-section-wide {
+  grid-column: 1 / -1;
+}
+
+.search-result-row {
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.5);
+}
+.search-result-row:last-child { border-bottom: none; }
+
+.search-result-title {
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--text);
+}
+
+.search-result-snippet {
+  margin-top: 4px;
+  font-size: 13.5px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
 .results-section {
   background: rgba(214,224,248,0.5);
-  backdrop-filter: blur(18px) saturate(160%);
-  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  backdrop-filter: blur(11px) saturate(160%);
+  -webkit-backdrop-filter: blur(11px) saturate(160%);
   border: 1px solid rgba(255,255,255,0.6);
   border-radius: 14px;
   padding: 16px 18px;

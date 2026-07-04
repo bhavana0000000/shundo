@@ -1,8 +1,8 @@
 .budget-total-card {
   margin-top: 28px;
   background: rgba(214,224,248,0.6);
-  backdrop-filter: blur(20px) saturate(160%);
-  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  backdrop-filter: blur(12px) saturate(160%);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
   border: 1px solid rgba(255,255,255,0.6);
   border-radius: 6px;
   padding: 22px 24px;
@@ -21,8 +21,8 @@
 
 .expense-form input {
   background: rgba(214,224,248,0.6);
-  backdrop-filter: blur(20px) saturate(160%);
-  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  backdrop-filter: blur(12px) saturate(160%);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
   border: 1px solid rgba(255,255,255,0.6);
   border-radius: 4px;
   padding: 11px 13px;
@@ -47,8 +47,8 @@
 .expense-row:last-child { border-bottom: none; }
 
 .expense-head { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-faint); background: rgba(214,224,248,0.6);
-  backdrop-filter: blur(20px) saturate(160%);
-  -webkit-backdrop-filter: blur(20px) saturate(160%); }
+  backdrop-filter: blur(12px) saturate(160%);
+  -webkit-backdrop-filter: blur(12px) saturate(160%); }
 .expense-cat { font-family: var(--font-mono); color: var(--pink-dim); text-transform: lowercase; }
 .expense-desc { color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .expense-amt { color: var(--text); text-align: right; font-family: var(--font-mono); }

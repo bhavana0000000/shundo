@@ -9,9 +9,9 @@ function formatDate(iso) {
   }
 }
 
-function Section({ title, children }) {
+function Section({ title, children, wide = false }) {
   return (
-    <div className="results-section">
+    <div className={`results-section ${wide ? 'results-section-wide' : ''}`}>
       <div className="results-section-title">{title}</div>
       {children}
     </div>
@@ -42,19 +42,20 @@ export default function ResultsSummary({ result }) {
   const KNOWN_TOOLS = [
     'search_flights', 'search_hotels', 'search_places', 'read_calendar_events',
     'get_weather_forecast', 'create_calendar_event', 'create_task',
-    'convert_currency', 'add_expense', 'create_email_draft', 'web_search',
+    'convert_currency', 'add_expense', 'create_email_draft', 'web_search', 'add_note',
   ];
   const otherSuccesses = result.tool_results.filter(
     (r) => !KNOWN_TOOLS.includes(r.tool) && r.result && !(r.result && r.result.error)
   );
   const emailDrafts = result.tool_results.filter((r) => r.tool === 'create_email_draft' && r.result && !r.result.error);
   const webSearches = result.tool_results.filter((r) => r.tool === 'web_search');
+  const notesAdded = result.tool_results.filter((r) => r.tool === 'add_note' && r.result && !r.result.error);
 
   const hasAnything =
     flights.length || hotels.length || places.length || weatherEntries.length ||
     createdEvent || tasksCreated.length || events.length ||
     conversions.length || expensesAdded.length || otherSuccesses.length ||
-    emailDrafts.length || webSearches.length;
+    emailDrafts.length || webSearches.length || notesAdded.length;
   if (!hasAnything) return null;
 
   return (
@@ -171,16 +172,16 @@ export default function ResultsSummary({ result }) {
       )}
 
       {webSearches.length > 0 && (
-        <Section title="Web search results">
+        <Section title="Web search results" wide>
           {(() => {
             const allItems = webSearches.filter((w) => Array.isArray(w.result)).flatMap((w) => w.result);
             const hasError = webSearches.some((w) => w.result && w.result.error);
 
             if (allItems.length > 0) {
               return allItems.slice(0, 4).map((item, i) => (
-                <div className="result-item-row" key={i}>
-                  <span className="result-item-name">{item.title || 'Result'}</span>
-                  {item.snippet && <span className="result-item-meta">{item.snippet.slice(0, 60)}...</span>}
+                <div className="search-result-row" key={i}>
+                  <div className="search-result-title">{item.title || 'Result'}</div>
+                  {item.snippet && <div className="search-result-snippet">{item.snippet}</div>}
                 </div>
               ));
             }
@@ -189,6 +190,16 @@ export default function ResultsSummary({ result }) {
             }
             return <div className="result-item-row"><span className="result-item-name">No clear results found for this search.</span></div>;
           })()}
+        </Section>
+      )}
+
+      {notesAdded.length > 0 && (
+        <Section title="Notes">
+          {notesAdded.map((n, i) => (
+            <div className="result-item-row" key={i}>
+              <span className="result-item-name">{n.result.content}</span>
+            </div>
+          ))}
         </Section>
       )}
 

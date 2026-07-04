@@ -25,35 +25,47 @@ export default function PaintTrail() {
     }
     window.addEventListener('mousemove', handleMove);
 
+    function drawPoint(p) {
+      // Cheap radial gradient instead of ctx.filter blur - dramatically
+      // faster since browsers don't have to run a real blur raster pass
+      // on every shape, every frame.
+      const gradient = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size);
+      gradient.addColorStop(0, p.color);
+      gradient.addColorStop(1, 'transparent');
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
     function animate() {
       frameCount++;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.globalCompositeOperation = 'screen';
 
-      if (mouseRef.current.active && frameCount % 2 === 0) {
+      // Generate a new point roughly every 4th frame instead of every 2nd -
+      // fewer points to draw = less work per frame, still looks continuous.
+      if (mouseRef.current.active && frameCount % 4 === 0) {
         pointsRef.current.push({
           x: mouseRef.current.x,
           y: mouseRef.current.y,
           color: COLORS[Math.floor(Math.random() * COLORS.length)],
-          size: 20 + Math.random() * 16,
+          size: 22 + Math.random() * 14,
           life: 1,
         });
-        if (pointsRef.current.length > 90) pointsRef.current.shift();
+        // Much smaller cap (30 vs 90) - the biggest single perf win, since
+        // every point costs a full radial-gradient + fill each frame.
+        if (pointsRef.current.length > 30) pointsRef.current.shift();
       }
 
       pointsRef.current.forEach((p) => {
-        p.life -= 0.01;
-        ctx.globalAlpha = Math.max(p.life * 0.45, 0);
-        ctx.fillStyle = p.color;
-        ctx.filter = 'blur(16px)';
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size * (1.4 - p.life * 0.4), 0, Math.PI * 2);
-        ctx.fill();
+        p.life -= 0.02; // fades a bit faster to match the smaller cap
+        ctx.globalAlpha = Math.max(p.life * 0.4, 0);
+        drawPoint(p);
       });
 
       pointsRef.current = pointsRef.current.filter((p) => p.life > 0);
       ctx.globalAlpha = 1;
-      ctx.filter = 'none';
       ctx.globalCompositeOperation = 'source-over';
 
       animationId = requestAnimationFrame(animate);
