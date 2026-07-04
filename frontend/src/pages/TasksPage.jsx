@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import TopShell from '../layout/TopShell';
+import { BACKEND_URL } from '../config';
 import './TasksPage.css';
-
-const BACKEND_URL = 'http://localhost:8001';
 
 export default function TasksPage() {
   const [tasks, setTasks] = useState([]);

@@ -2,13 +2,16 @@
 Shundo backend - single entrypoint. Wires up Google OAuth, the calendar
 reflection loop, the dynamic multi-tool loop, and test/cleanup routes.
 """
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Request, Response
 from pydantic import BaseModel
 from fastapi.responses import RedirectResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+import time
+import uuid
+from collections import defaultdict
 
-from app.auth import get_authorization_url, exchange_code_for_token, is_authenticated
 from app.config import FRONTEND_ORIGIN
+from app.auth import get_authorization_url, exchange_code_for_token, is_authenticated
 from app.tools import (
     read_calendar_events, create_calendar_event, delete_calendar_event,
     search_flights, search_hotels, search_events, search_places, web_search,
@@ -20,9 +23,56 @@ from app.agents import run_shundo, run_forced_conflict_test, run_dynamic_task, s
 app = FastAPI(title="Shundo Backend")
 
 app.add_middleware(
-    CORSMiddleware, allow_origins=["*"], allow_credentials=False,
+    CORSMiddleware, allow_origins=[FRONTEND_ORIGIN], allow_credentials=True,
     allow_methods=["*"], allow_headers=["*"],
 )
+
+
+# --- Session identity (per-browser data isolation for tasks/budget/notes) ---
+
+SESSION_COOKIE_NAME = "shundo_session"
+
+
+def get_or_create_session_id(request: Request, response: Response) -> str:
+    """Reads the session cookie if present, otherwise creates a new one.
+    This is what keeps each visitor's tasks/budget/notes separate."""
+    session_id = request.cookies.get(SESSION_COOKIE_NAME)
+    if not session_id:
+        session_id = str(uuid.uuid4())
+        response.set_cookie(
+            key=SESSION_COOKIE_NAME, value=session_id,
+            httponly=True, samesite="none", secure=True, max_age=60 * 60 * 24 * 30,
+        )
+    return session_id
+
+
+def get_session_id_from_ws(websocket: WebSocket) -> str:
+    """WebSocket version - reads existing cookie, or generates a temporary
+    one if none exists yet (WebSocket handshakes can't set cookies)."""
+    return websocket.cookies.get(SESSION_COOKIE_NAME) or str(uuid.uuid4())
+
+
+# --- Rate limiting (protects LLM quota from abuse by public visitors) ---
+# Simple in-memory sliding window: N requests per IP per time window.
+# Good enough for a demo - resets when the server restarts, no external
+# dependency needed (Redis etc would be needed for a real multi-instance setup).
+
+_rate_limit_store = defaultdict(list)
+RATE_LIMIT_MAX_REQUESTS = 15
+RATE_LIMIT_WINDOW_SECONDS = 3600  # 1 hour
+
+
+def check_rate_limit(key: str):
+    now = time.time()
+    window_start = now - RATE_LIMIT_WINDOW_SECONDS
+    _rate_limit_store[key] = [t for t in _rate_limit_store[key] if t > window_start]
+
+    if len(_rate_limit_store[key]) >= RATE_LIMIT_MAX_REQUESTS:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Rate limit reached ({RATE_LIMIT_MAX_REQUESTS} runs/hour on this demo). Try again later.",
+        )
+    _rate_limit_store[key].append(now)
 
 
 @app.get("/")
@@ -33,19 +83,27 @@ def root():
 # --- Google OAuth ---
 
 @app.get("/auth/google/login")
-def google_login():
-    return RedirectResponse(get_authorization_url())
+def google_login(request: Request, response: Response):
+    session_id = get_or_create_session_id(request, response)
+    auth_url = get_authorization_url(session_id)
+    redirect = RedirectResponse(auth_url)
+    # copy the session cookie onto the redirect response too, in case it was just created
+    if response.headers.get("set-cookie"):
+        redirect.headers["set-cookie"] = response.headers["set-cookie"]
+    return redirect
 
 
 @app.get("/auth/google/callback")
-def google_callback(code: str):
-    exchange_code_for_token(code)
+def google_callback(code: str, state: str):
+    # 'state' carries the session_id through Google's redirect round-trip
+    exchange_code_for_token(code, session_id=state)
     return JSONResponse({"status": "Google account connected successfully. You can close this tab."})
 
 
 @app.get("/auth/google/status")
-def google_status():
-    return {"authenticated": is_authenticated()}
+def google_status(request: Request, response: Response):
+    session_id = get_or_create_session_id(request, response)
+    return {"authenticated": is_authenticated(session_id)}
 
 
 # --- Calendar reflection loop (proven demo centerpiece) ---
@@ -77,9 +135,11 @@ def test_force_conflict(start_iso: str, end_iso: str):
 # --- Dynamic multi-tool loop (domain-agnostic, any goal) ---
 
 @app.post("/agent/dynamic")
-def agent_dynamic(goal: str):
+def agent_dynamic(goal: str, request: Request, response: Response):
     """Runs the dynamic planner->executor->critic loop across ALL 11 tools."""
-    return run_dynamic_task(goal)
+    session_id = get_or_create_session_id(request, response)
+    check_rate_limit(session_id)
+    return run_dynamic_task(goal, session_id=session_id)
 
 
 @app.websocket("/ws/agent/dynamic")
@@ -92,12 +152,17 @@ async def ws_agent_dynamic(websocket: WebSocket):
     """
     await websocket.accept()
     try:
+        session_id = get_session_id_from_ws(websocket)
+        check_rate_limit(session_id)
+
         data = await websocket.receive_json()
         goal = data.get("goal", "")
 
-        for message in stream_dynamic_task(goal):
+        for message in stream_dynamic_task(goal, session_id=session_id):
             await websocket.send_json(message)
 
+    except HTTPException as e:
+        await websocket.send_json({"type": "error", "message": e.detail})
     except WebSocketDisconnect:
         pass
     except Exception as e:
@@ -197,14 +262,16 @@ class ExpenseIn(BaseModel):
 
 
 @app.get("/api/budget")
-def api_list_budget():
-    return {"expenses": list_expenses(), "total": get_total_spend()}
+def api_list_budget(request: Request, response: Response):
+    session_id = get_or_create_session_id(request, response)
+    return {"expenses": list_expenses(session_id=session_id), "total": get_total_spend(session_id=session_id)}
 
 
 @app.post("/api/budget")
-def api_add_budget(expense: ExpenseIn):
-    entry = add_expense(expense.category, expense.amount, expense.description, expense.currency)
-    return {"entry": entry, "total": get_total_spend()}
+def api_add_budget(expense: ExpenseIn, request: Request, response: Response):
+    session_id = get_or_create_session_id(request, response)
+    entry = add_expense(expense.category, expense.amount, expense.description, expense.currency, session_id=session_id)
+    return {"entry": entry, "total": get_total_spend(session_id=session_id)}
 
 
 # --- Tasks API (real, used by the frontend Tasks page) ---
@@ -215,23 +282,27 @@ class TaskIn(BaseModel):
 
 
 @app.get("/api/tasks")
-def api_list_tasks():
-    return {"tasks": list_tasks(include_completed=True)}
+def api_list_tasks(request: Request, response: Response):
+    session_id = get_or_create_session_id(request, response)
+    return {"tasks": list_tasks(include_completed=True, session_id=session_id)}
 
 
 @app.post("/api/tasks")
-def api_add_task(task: TaskIn):
-    return create_task(task.title, task.due_date)
+def api_add_task(task: TaskIn, request: Request, response: Response):
+    session_id = get_or_create_session_id(request, response)
+    return create_task(task.title, task.due_date, session_id=session_id)
 
 
 @app.post("/api/tasks/{task_id}/complete")
-def api_complete_task(task_id: int):
-    return complete_task(task_id)
+def api_complete_task(task_id: int, request: Request, response: Response):
+    session_id = get_or_create_session_id(request, response)
+    return complete_task(task_id, session_id=session_id)
 
 
 # --- Calendar API (real, used by the frontend Calendar page) ---
 
 @app.get("/api/calendar")
-def api_calendar_events():
-    events = read_calendar_events(days_ahead=30)
-    return {"events": events, "authenticated": is_authenticated()}
+def api_calendar_events(request: Request, response: Response):
+    session_id = get_or_create_session_id(request, response)
+    events = read_calendar_events(days_ahead=30, session_id=session_id)
+    return {"events": events, "authenticated": is_authenticated(session_id)}

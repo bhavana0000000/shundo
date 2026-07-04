@@ -172,6 +172,7 @@ def run_forced_conflict_test(start_iso: str, end_iso: str) -> ShundoState:
 
 class DynamicState(TypedDict):
     goal: str
+    session_id: str
     tool_calls: list[dict]
     tool_results: list[dict]
     critic_summary: Optional[str]
@@ -198,7 +199,14 @@ Respond ONLY with a JSON array, no other text. Each item:
 {{"tool": "tool_name", "args": {{"arg1": "value1"}}}}
 
 Use only the EXACT argument names shown in the tool signatures above - do not invent alternate names.
-Call only the tools genuinely needed for this goal."""
+Call only the tools genuinely needed for this goal.
+
+CRITICAL: All tools in this batch run independently and CANNOT see each other's results. NEVER write
+a placeholder like "tool_output.convert_currency" or "{{result_of_previous_tool}}" as an argument value -
+these are not real values and will break. If a goal requires converting a currency before logging an
+expense, calculate the converted amount yourself using a reasonable real-world exchange rate and pass
+that actual number directly. Every argument value must be a concrete, real value you can compute now,
+never a reference to another tool's future output."""
 
     context = f"User goal: {state['goal']}"
     if state.get("critic_summary"):
@@ -224,12 +232,14 @@ def execute_dynamic(state: DynamicState) -> dict:
     from concurrent.futures import ThreadPoolExecutor
 
     calls = state["tool_calls"]
+    session_id = state.get("session_id", "default")
 
     def run_one(c):
         tool_name = c.get("tool")
-        args = c.get("args", {})
+        args = dict(c.get("args", {}))
+        args["session_id"] = session_id  # call_tool silently drops this if the tool doesn't accept it
         result = call_tool(tool_name, args)
-        return {"tool": tool_name, "args": args, "result": result}
+        return {"tool": tool_name, "args": c.get("args", {}), "result": result}
 
     with ThreadPoolExecutor(max_workers=max(len(calls), 1)) as pool:
         results = list(pool.map(run_one, calls))
@@ -281,16 +291,16 @@ def build_dynamic_graph():
     return graph.compile()
 
 
-def run_dynamic_task(goal: str) -> DynamicState:
+def run_dynamic_task(goal: str, session_id: str = "default") -> DynamicState:
     app_graph = build_dynamic_graph()
     initial_state: DynamicState = {
-        "goal": goal, "tool_calls": [], "tool_results": [], "critic_summary": None,
+        "goal": goal, "session_id": session_id, "tool_calls": [], "tool_results": [], "critic_summary": None,
         "trace": [], "retry_count": 0, "needs_retry": False,
     }
     return app_graph.invoke(initial_state)
 
 
-def stream_dynamic_task(goal: str):
+def stream_dynamic_task(goal: str, session_id: str = "default"):
     """
     Generator version for WebSocket streaming: yields only the NEW trace
     entries after each graph step, instead of waiting for the whole run
@@ -298,7 +308,7 @@ def stream_dynamic_task(goal: str):
     """
     app_graph = build_dynamic_graph()
     initial_state: DynamicState = {
-        "goal": goal, "tool_calls": [], "tool_results": [], "critic_summary": None,
+        "goal": goal, "session_id": session_id, "tool_calls": [], "tool_results": [], "critic_summary": None,
         "trace": [], "retry_count": 0, "needs_retry": False,
     }
 

@@ -22,10 +22,10 @@ from app.llm import get_llm
 
 # ============ CALENDAR ============
 
-def _get_calendar_service():
-    creds = load_credentials()
+def _get_calendar_service(session_id: str = "default"):
+    creds = load_credentials(session_id)
     if creds is None:
-        raise RuntimeError("Not authenticated with Google yet. Visit /auth/google/login first.")
+        return None  # caller decides how to handle "not connected" gracefully
     return build("calendar", "v3", credentials=creds)
 
 
@@ -36,8 +36,11 @@ def _to_local_iso(dt_str: str) -> str:
     return dt.isoformat()
 
 
-def read_calendar_events(days_ahead: int = 14) -> list[dict]:
-    service = _get_calendar_service()
+def read_calendar_events(days_ahead: int = 14, session_id: str = "default") -> list[dict]:
+    service = _get_calendar_service(session_id)
+    if service is None:
+        return []  # not connected yet - empty schedule, not an error
+
     now_local = datetime.now(ZoneInfo(TIMEZONE))
     later_local = now_local + timedelta(days=days_ahead)
     events_result = service.events().list(
@@ -57,8 +60,11 @@ def read_calendar_events(days_ahead: int = 14) -> list[dict]:
     return result
 
 
-def create_calendar_event(title: str, start_iso: str, end_iso: str, description: str = "") -> dict:
-    service = _get_calendar_service()
+def create_calendar_event(title: str, start_iso: str, end_iso: str, description: str = "", session_id: str = "default") -> dict:
+    service = _get_calendar_service(session_id)
+    if service is None:
+        return {"error": "Not connected to Google Calendar yet. Sign in first to create real events."}
+
     start_clean = start_iso.replace("Z", "")
     end_clean = end_iso.replace("Z", "")
     event_body = {
@@ -77,8 +83,10 @@ def create_calendar_event(title: str, start_iso: str, end_iso: str, description:
     }
 
 
-def delete_calendar_event(event_id: str) -> dict:
-    service = _get_calendar_service()
+def delete_calendar_event(event_id: str, session_id: str = "default") -> dict:
+    service = _get_calendar_service(session_id)
+    if service is None:
+        return {"error": "Not connected to Google Calendar yet."}
     service.events().delete(calendarId="primary", eventId=event_id).execute()
     return {"deleted": True, "id": event_id}
 
@@ -257,10 +265,11 @@ def web_search(query: str, num_results: int = 5) -> list[dict]:
 
 # ============ EMAIL DRAFT (Gmail) ============
 
-def create_email_draft(to: str, subject: str, body: str) -> dict:
-    creds = load_credentials()
+def create_email_draft(to: str, subject: str, body: str, session_id: str = "default") -> dict:
+    creds = load_credentials(session_id)
     if creds is None:
-        raise RuntimeError("Not authenticated with Google yet.")
+        return {"error": "Not connected to Gmail yet. Sign in first to create real drafts."}
+
     service = build("gmail", "v1", credentials=creds)
     message = MIMEText(body)
     message["to"] = to
@@ -272,32 +281,32 @@ def create_email_draft(to: str, subject: str, body: str) -> dict:
 
 # ============ TASKS ============
 
-def create_task(title: str, due_date: str = None) -> dict:
+def create_task(title: str, due_date: str = None, session_id: str = "default") -> dict:
     conn = get_connection()
     cur = conn.cursor()
-    cur.execute("INSERT INTO tasks (title, due_date) VALUES (?, ?)", (title, due_date))
+    cur.execute("INSERT INTO tasks (session_id, title, due_date) VALUES (?, ?, ?)", (session_id, title, due_date))
     conn.commit()
     task_id = cur.lastrowid
     conn.close()
     return {"id": task_id, "title": title, "due_date": due_date, "completed": False}
 
 
-def list_tasks(include_completed: bool = False) -> list[dict]:
+def list_tasks(include_completed: bool = False, session_id: str = "default") -> list[dict]:
     conn = get_connection()
     cur = conn.cursor()
     if include_completed:
-        cur.execute("SELECT * FROM tasks ORDER BY created_at DESC")
+        cur.execute("SELECT * FROM tasks WHERE session_id = ? ORDER BY created_at DESC", (session_id,))
     else:
-        cur.execute("SELECT * FROM tasks WHERE completed = 0 ORDER BY created_at DESC")
+        cur.execute("SELECT * FROM tasks WHERE session_id = ? AND completed = 0 ORDER BY created_at DESC", (session_id,))
     rows = cur.fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
 
-def complete_task(task_id: int) -> dict:
+def complete_task(task_id: int, session_id: str = "default") -> dict:
     conn = get_connection()
     cur = conn.cursor()
-    cur.execute("UPDATE tasks SET completed = 1 WHERE id = ?", (task_id,))
+    cur.execute("UPDATE tasks SET completed = 1 WHERE id = ? AND session_id = ?", (task_id, session_id))
     conn.commit()
     conn.close()
     return {"id": task_id, "completed": True}
@@ -305,20 +314,20 @@ def complete_task(task_id: int) -> dict:
 
 # ============ NOTES ============
 
-def add_note(agent: str, content: str) -> dict:
+def add_note(agent: str, content: str, session_id: str = "default") -> dict:
     conn = get_connection()
     cur = conn.cursor()
-    cur.execute("INSERT INTO notes (agent, content) VALUES (?, ?)", (agent, content))
+    cur.execute("INSERT INTO notes (session_id, agent, content) VALUES (?, ?, ?)", (session_id, agent, content))
     conn.commit()
     note_id = cur.lastrowid
     conn.close()
     return {"id": note_id, "agent": agent, "content": content}
 
 
-def list_notes(limit: int = 20) -> list[dict]:
+def list_notes(limit: int = 20, session_id: str = "default") -> list[dict]:
     conn = get_connection()
     cur = conn.cursor()
-    cur.execute("SELECT * FROM notes ORDER BY created_at DESC LIMIT ?", (limit,))
+    cur.execute("SELECT * FROM notes WHERE session_id = ? ORDER BY created_at DESC LIMIT ?", (session_id, limit))
     rows = cur.fetchall()
     conn.close()
     return [dict(r) for r in rows]
@@ -326,29 +335,34 @@ def list_notes(limit: int = 20) -> list[dict]:
 
 # ============ BUDGET ============
 
-def add_expense(category: str, amount: float, description: str = "", currency: str = "INR") -> dict:
+def add_expense(category: str, amount, description: str = "", currency: str = "INR", session_id: str = "default") -> dict:
+    try:
+        amount = float(amount)
+    except (ValueError, TypeError):
+        return {"error": f"Invalid amount value: '{amount}' is not a real number. Expense was not logged."}
+
     conn = get_connection()
     cur = conn.cursor()
-    cur.execute("INSERT INTO budget_entries (category, description, amount, currency) VALUES (?, ?, ?, ?)", (category, description, amount, currency))
+    cur.execute("INSERT INTO budget_entries (session_id, category, description, amount, currency) VALUES (?, ?, ?, ?, ?)", (session_id, category, description, amount, currency))
     conn.commit()
     entry_id = cur.lastrowid
     conn.close()
     return {"id": entry_id, "category": category, "amount": amount, "currency": currency}
 
 
-def get_total_spend(currency: str = "INR") -> dict:
+def get_total_spend(currency: str = "INR", session_id: str = "default") -> dict:
     conn = get_connection()
     cur = conn.cursor()
-    cur.execute("SELECT SUM(amount) as total FROM budget_entries WHERE currency = ?", (currency,))
+    cur.execute("SELECT SUM(amount) as total FROM budget_entries WHERE currency = ? AND session_id = ?", (currency, session_id))
     row = cur.fetchone()
     conn.close()
     return {"total": row["total"] or 0, "currency": currency}
 
 
-def list_expenses() -> list[dict]:
+def list_expenses(session_id: str = "default") -> list[dict]:
     conn = get_connection()
     cur = conn.cursor()
-    cur.execute("SELECT * FROM budget_entries ORDER BY created_at DESC")
+    cur.execute("SELECT * FROM budget_entries WHERE session_id = ? ORDER BY created_at DESC", (session_id,))
     rows = cur.fetchall()
     conn.close()
     return [dict(r) for r in rows]

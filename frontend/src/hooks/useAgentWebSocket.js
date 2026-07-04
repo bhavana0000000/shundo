@@ -1,6 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
-
-const WS_URL = 'ws://localhost:8001/ws/agent/dynamic';
+import { WS_URL } from '../config';
 
 export function useAgentWebSocket() {
   const [trace, setTrace] = useState([]);
@@ -46,7 +45,7 @@ export function useAgentWebSocket() {
     };
 
     ws.onerror = () => {
-      setError('Connection failed. Is the backend running on port 8001?');
+      setError('Connection failed.');
       setStatus('error');
     };
 

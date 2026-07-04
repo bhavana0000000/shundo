@@ -1,8 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import PetalShower from '../components/PetalShower';
+import { BACKEND_URL } from '../config';
 import './Login.css';
-
-const BACKEND_URL = 'http://localhost:8001';
 
 export default function Login() {
   const navigate = useNavigate();
