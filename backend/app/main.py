@@ -11,7 +11,7 @@ import uuid
 from collections import defaultdict
 
 from app.config import FRONTEND_ORIGIN
-from app.auth import get_authorization_url, exchange_code_for_token, is_authenticated
+from app.auth import get_authorization_url, exchange_code_for_token, is_authenticated, get_user_info
 from app.tools import (
     read_calendar_events, create_calendar_event, delete_calendar_event,
     search_flights, search_hotels, search_events, search_places, web_search,
@@ -97,13 +97,16 @@ def google_login(request: Request, response: Response):
 def google_callback(code: str, state: str):
     # 'state' carries the session_id through Google's redirect round-trip
     exchange_code_for_token(code, session_id=state)
-    return JSONResponse({"status": "Google account connected successfully. You can close this tab."})
+    # Send the user back into the real app instead of leaving them on a bare backend JSON page
+    return RedirectResponse(f"{FRONTEND_ORIGIN}/app")
 
 
 @app.get("/auth/google/status")
 def google_status(request: Request, response: Response):
     session_id = get_or_create_session_id(request, response)
-    return {"authenticated": is_authenticated(session_id)}
+    authenticated = is_authenticated(session_id)
+    user_info = get_user_info(session_id) if authenticated else None
+    return {"authenticated": authenticated, "user": user_info}
 
 
 # --- Calendar reflection loop (proven demo centerpiece) ---

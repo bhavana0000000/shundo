@@ -7,15 +7,18 @@ export default function Profile() {
   const [authStatus, setAuthStatus] = useState(null);
 
   useEffect(() => {
-    fetch(`${BACKEND_URL}/auth/google/status`)
+    fetch(`${BACKEND_URL}/auth/google/status`, { credentials: 'include' })
       .then((r) => r.json())
       .then(setAuthStatus)
-      .catch(() => setAuthStatus({ authenticated: false }));
+      .catch(() => setAuthStatus({ authenticated: false, user: null }));
   }, []);
 
   const handleConnect = () => {
     window.location.href = `${BACKEND_URL}/auth/google/login`;
   };
+
+  const isAuthed = authStatus?.authenticated;
+  const user = authStatus?.user;
 
   return (
     <TopShell>
@@ -26,10 +29,14 @@ export default function Profile() {
       </div>
 
       <div className="profile-card">
-        <div className="profile-avatar">S</div>
+        {user?.picture ? (
+          <img src={user.picture} alt="" className="profile-avatar-img" />
+        ) : (
+          <div className="profile-avatar">{isAuthed ? (user?.name?.[0] || 'U') : 'G'}</div>
+        )}
         <div>
-          <div className="profile-name">Guest session</div>
-          <div className="profile-sub">connected via demo mode</div>
+          <div className="profile-name">{isAuthed ? (user?.name || user?.email || 'Signed in') : 'Guest session'}</div>
+          <div className="profile-sub">{isAuthed ? user?.email : 'not connected — using guest mode'}</div>
         </div>
       </div>
 
@@ -39,7 +46,7 @@ export default function Profile() {
             <div className="connection-name">Google Calendar</div>
             <div className="connection-desc">read + write real events, used by the reflection loop</div>
           </div>
-          {authStatus?.authenticated ? (
+          {isAuthed ? (
             <span className="connection-badge ok">connected</span>
           ) : (
             <button className="btn btn-ghost connect-btn" onClick={handleConnect}>connect</button>
@@ -51,7 +58,7 @@ export default function Profile() {
             <div className="connection-name">Gmail</div>
             <div className="connection-desc">creates real drafts, never auto-sends</div>
           </div>
-          {authStatus?.authenticated ? (
+          {isAuthed ? (
             <span className="connection-badge ok">connected</span>
           ) : (
             <span className="connection-badge">shares Google connection above</span>

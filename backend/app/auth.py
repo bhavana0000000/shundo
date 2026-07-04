@@ -13,6 +13,7 @@ import json
 from google_auth_oauthlib.flow import Flow
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
+from googleapiclient.discovery import build
 
 from app.config import GOOGLE_CLIENT_SECRETS_FILE, GOOGLE_REDIRECT_URI, GOOGLE_SCOPES
 from app.db import get_connection
@@ -83,3 +84,16 @@ def load_credentials(session_id: str = "default") -> Credentials | None:
 
 def is_authenticated(session_id: str = "default") -> bool:
     return load_credentials(session_id) is not None
+
+
+def get_user_info(session_id: str = "default") -> dict | None:
+    """Fetches the real logged-in user's Google name/email/picture."""
+    creds = load_credentials(session_id)
+    if creds is None:
+        return None
+    try:
+        service = build("oauth2", "v2", credentials=creds)
+        info = service.userinfo().get().execute()
+        return {"name": info.get("name"), "email": info.get("email"), "picture": info.get("picture")}
+    except Exception:
+        return None
