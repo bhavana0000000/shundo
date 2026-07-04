@@ -16,7 +16,7 @@ export default function CalendarPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`${BACKEND_URL}/api/calendar`)
+    fetch(`${BACKEND_URL}/api/calendar`, { credentials: 'include' })
       .then((r) => r.json())
       .then((data) => {
         setEvents(data.events || []);

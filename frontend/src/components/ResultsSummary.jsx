@@ -42,16 +42,19 @@ export default function ResultsSummary({ result }) {
   const KNOWN_TOOLS = [
     'search_flights', 'search_hotels', 'search_places', 'read_calendar_events',
     'get_weather_forecast', 'create_calendar_event', 'create_task',
-    'convert_currency', 'add_expense',
+    'convert_currency', 'add_expense', 'create_email_draft', 'web_search',
   ];
   const otherSuccesses = result.tool_results.filter(
     (r) => !KNOWN_TOOLS.includes(r.tool) && r.result && !(r.result && r.result.error)
   );
+  const emailDrafts = result.tool_results.filter((r) => r.tool === 'create_email_draft' && r.result && !r.result.error);
+  const webSearches = result.tool_results.filter((r) => r.tool === 'web_search');
 
   const hasAnything =
     flights.length || hotels.length || places.length || weatherEntries.length ||
     createdEvent || tasksCreated.length || events.length ||
-    conversions.length || expensesAdded.length || otherSuccesses.length;
+    conversions.length || expensesAdded.length || otherSuccesses.length ||
+    emailDrafts.length || webSearches.length;
   if (!hasAnything) return null;
 
   return (
@@ -153,6 +156,39 @@ export default function ResultsSummary({ result }) {
               <span className="result-item-meta">{e.result.currency} {e.result.amount}</span>
             </div>
           ))}
+        </Section>
+      )}
+
+      {emailDrafts.length > 0 && (
+        <Section title="Email drafts created">
+          {emailDrafts.map((e, i) => (
+            <div className="result-item-row" key={i}>
+              <span className="result-item-name">{e.result.subject}</span>
+              <span className="result-item-meta">to {e.result.to}</span>
+            </div>
+          ))}
+        </Section>
+      )}
+
+      {webSearches.length > 0 && (
+        <Section title="Web search results">
+          {(() => {
+            const allItems = webSearches.filter((w) => Array.isArray(w.result)).flatMap((w) => w.result);
+            const hasError = webSearches.some((w) => w.result && w.result.error);
+
+            if (allItems.length > 0) {
+              return allItems.slice(0, 4).map((item, i) => (
+                <div className="result-item-row" key={i}>
+                  <span className="result-item-name">{item.title || 'Result'}</span>
+                  {item.snippet && <span className="result-item-meta">{item.snippet.slice(0, 60)}...</span>}
+                </div>
+              ));
+            }
+            if (hasError) {
+              return <div className="result-item-row"><span className="result-item-name">Search failed — try rephrasing the goal.</span></div>;
+            }
+            return <div className="result-item-row"><span className="result-item-name">No clear results found for this search.</span></div>;
+          })()}
         </Section>
       )}
 

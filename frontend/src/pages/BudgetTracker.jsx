@@ -13,7 +13,7 @@ export default function BudgetTracker() {
   const fetchBudget = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${BACKEND_URL}/api/budget`);
+      const res = await fetch(`${BACKEND_URL}/api/budget`, { credentials: 'include' });
       const data = await res.json();
       setExpenses(data.expenses || []);
       setTotal(data.total || { total: 0, currency: 'INR' });
@@ -32,6 +32,7 @@ export default function BudgetTracker() {
     try {
       await fetch(`${BACKEND_URL}/api/budget`, {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           category: form.category,

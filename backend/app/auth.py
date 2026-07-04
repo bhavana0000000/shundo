@@ -9,6 +9,10 @@ The OAuth "state" parameter carries the session_id through Google's
 redirect round-trip (cookies aren't always reliable to read back after a
 cross-site redirect, but state always survives).
 """
+import os
+os.environ.setdefault("OAUTHLIB_RELAX_TOKEN_SCOPE", "1")  # Google auto-adds 'openid' scope; without
+                                                            # this, the OAuth library errors on the mismatch
+
 import json
 from google_auth_oauthlib.flow import Flow
 from google.oauth2.credentials import Credentials

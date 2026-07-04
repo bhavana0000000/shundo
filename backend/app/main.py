@@ -75,7 +75,7 @@ def check_rate_limit(key: str):
     _rate_limit_store[key].append(now)
 
 
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 def root():
     return {"status": "Shundo backend is running"}
 

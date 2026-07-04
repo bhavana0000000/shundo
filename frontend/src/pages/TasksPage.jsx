@@ -12,7 +12,7 @@ export default function TasksPage() {
   const fetchTasks = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${BACKEND_URL}/api/tasks`);
+      const res = await fetch(`${BACKEND_URL}/api/tasks`, { credentials: 'include' });
       const data = await res.json();
       setTasks(data.tasks || []);
     } catch (e) {
@@ -30,6 +30,7 @@ export default function TasksPage() {
     try {
       await fetch(`${BACKEND_URL}/api/tasks`, {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: newTask.trim() }),
       });
@@ -42,7 +43,7 @@ export default function TasksPage() {
   };
 
   const handleComplete = async (id) => {
-    await fetch(`${BACKEND_URL}/api/tasks/${id}/complete`, { method: 'POST' });
+    await fetch(`${BACKEND_URL}/api/tasks/${id}/complete`, { method: 'POST', credentials: 'include' });
     fetchTasks();
   };
 
